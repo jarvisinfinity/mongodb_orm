@@ -1,8 +1,9 @@
 from setuptools import setup, find_packages
+from mongodb_orm import __version__
 
 setup(
     name='mongodb_orm',
-    version='1.0.0',
+    version=__version__,
     packages=find_packages(),
     install_requires=[
         'pydantic==2.8.2',
