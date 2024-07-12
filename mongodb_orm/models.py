@@ -16,6 +16,10 @@ class BaseModel(pydantic.BaseModel):
     """
     id: int = pydantic.Field(default=None)
     def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    @classmethod
+    def __initialize__(cls):
         class Meta:
             mongo_uri: str = os.environ.get("MONGO_URI")
             database_name: str = os.environ.get("MONGO_DATABASE")
@@ -34,15 +38,13 @@ class BaseModel(pydantic.BaseModel):
         cls.collection: Collection = cls.database[cls.collection_name]
         cls.id_sequences: Collection = cls.database["id_sequences"]
 
-        return super().__new__(cls)
-
     def dict(self):
         return super().model_dump()
 
     def json(self):
         return super().model_dump_json()
 
-    async def get_id(self):
+    async def _get_id(self):
         if not self.id:
             sequence = await self.id_sequences.find_one_and_update(
                 {"_id": self.collection_name},
@@ -67,21 +69,26 @@ class BaseModel(pydantic.BaseModel):
         flat_projection = projection.pop("flat", False)
         if "_id" not in projection.keys():
             projection["_id"] = 0
+
+        if distinct:
+            responses = await cls.collection.distinct(distinct, filter=kwargs)
+            if only_count:
+                return len(responses)
+            return responses
+        elif only_count:
+            return await cls.collection.count_documents(filter=kwargs)
+
         responses = cls.collection.find(filter=kwargs, projection=projection)
         if sort_by:
             responses = responses.sort(sort_by)
-        if distinct:
-            responses = responses.distinct(distinct)
-        if only_count:
-            return len(list(responses))
         if len(projection) == 1 and ("_id" in projection.keys()):
-            resp = [await cls(**resp) for resp in responses] if responses else []
+            resp = [cls(**resp) async for resp in responses] if responses else []
         elif len(projection) == 2 and ("_id" in projection.keys()) and flat_projection:
             projection.pop("_id")
             key = list(projection.keys())[0]
-            resp = [await resp[key] for resp in responses] if responses else []
+            resp = [resp[key] async for resp in responses] if responses else []
         else:
-            resp = [await resp for resp in responses] if responses else []
+            resp = [resp async for resp in responses] if responses else []
         return resp
 
     @classmethod
@@ -92,7 +99,7 @@ class BaseModel(pydantic.BaseModel):
     async def create(cls, **kwargs):
         self = cls(**kwargs)
         if not self.id:
-            self.id = await self.get_id()
+            self.id = await self._get_id()
         result = await cls.collection.insert_one(self.dict())
         return await self.get(_id=result.inserted_id)
 
@@ -108,13 +115,16 @@ class BaseModel(pydantic.BaseModel):
             if only_update:
                 return False
             else:
-                self.id = await self.get_id()
+                self.id = await self._get_id()
         await self.collection.update_one({"id": self.id}, {"$set": self.dict()}, upsert=not only_update)
         return self
 
     async def delete(self):
-        await self.collection.delete_one({"id": self.id})
-        return True
+        return await self.collection.delete_one({"id": self.id})
+
+    @classmethod
+    async def direct_delete(self, **kwargs):
+        return await self.collection.delete_many(filter=kwargs)
 
     @classmethod
     async def aggregate(cls, *args, **kwargs):
