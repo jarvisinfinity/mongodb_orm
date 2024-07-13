@@ -20,6 +20,7 @@ class BaseModel(pydantic.BaseModel):
 
     @classmethod
     def __initialize__(cls):
+        print(f"Initializing {cls.__name__} Model")
         class Meta:
             mongo_uri: str = os.environ.get("MONGO_URI")
             database_name: str = os.environ.get("MONGO_DATABASE")
@@ -130,6 +131,14 @@ class BaseModel(pydantic.BaseModel):
     async def aggregate(cls, *args, **kwargs):
         data = await cls.collection.aggregate(*args, **kwargs)
         return list(data) if data else None
+
+    async def refresh_from_db(self):
+        if self.id:
+            resp = await self.get(id=self.id)
+            if resp:
+                self.__dict__.update(resp.__dict__)
+                return self
+        return None
 
     @classmethod
     async def make_unique(cls, field, order=pymongo.ASCENDING):
