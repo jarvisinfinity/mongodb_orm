@@ -19,7 +19,7 @@ class BaseModel(pydantic.BaseModel):
         return super().__new__(cls)
 
     @classmethod
-    def __initialize__(cls):
+    def __initialize__(cls, client: Client=None):
         print(f"Initializing {cls.__name__} Model")
         class Meta:
             mongo_uri: str = os.environ.get("MONGO_URI")
@@ -33,7 +33,10 @@ class BaseModel(pydantic.BaseModel):
             if not key.startswith('__'):  # Exclude special attributes
                 setattr(cls, key, getattr(cls.custome_meta, key, value))
 
-        cls.client = Client(cls.mongo_uri)
+        if client and isinstance(client, Client):
+            cls.client = client
+        else:
+            cls.client = Client(cls.mongo_uri)
         cls.database: Database = cls.client[cls.database_name]
 
         cls.collection: Collection = cls.database[cls.collection_name]

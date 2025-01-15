@@ -2,6 +2,7 @@ import inspect
 from typing import *
 from pydantic import *
 from datetime import datetime, UTC
+from motor.motor_asyncio import AsyncIOMotorClient
 
 def get_classes_from_module(module_name):
     # Dynamically import the module
@@ -13,9 +14,9 @@ def get_classes_from_module(module_name):
     return classes
 
 
-def register_model(cls):
+def register_model(cls, client: AsyncIOMotorClient=None):
     try:
-        cls.__initialize__()
+        cls.__initialize__(client)
         print(cls.__name__ + " model registered successfully")
         return True
     except Exception as e:
@@ -25,12 +26,12 @@ def register_model(cls):
         raise e
 
 
-def register_models(classes):
+def register_models(classes, client: AsyncIOMotorClient=None):
     # Print the names of the classes
-    return [register_model(cls) for cls in classes]
+    return [register_model(cls, client) for cls in classes]
 
 
-def register_all_models(module_name):
+def register_all_models(module_name, client: AsyncIOMotorClient=None):
     """ This will register all the classes defined in this page with the given module name.
         call this function once at the end of the module, where the classes are defined.
 
@@ -40,7 +41,7 @@ def register_all_models(module_name):
     # Get all classes defined in the current module
     all_classes = get_classes_from_module(module_name)
 
-    return register_models(all_classes)
+    return register_models(all_classes, client)
 
 
 current_datetime = lambda: datetime.now(UTC)
