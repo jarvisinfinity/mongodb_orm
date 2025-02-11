@@ -6,8 +6,8 @@ setup(
     version=__version__,
     packages=find_packages(),
     install_requires=[
-        'pydantic==2.8.2',
-        'motor==3.5.1'
+        'pydantic>=2.8.2',
+        'motor>=3.5.1'
     ],
     entry_points={
         'console_scripts': []
