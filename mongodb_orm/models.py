@@ -68,6 +68,8 @@ class BaseModel(pydantic.BaseModel):
     async def filter(cls, **kwargs):
         sort_by = kwargs.pop("sort_by", {"id": 1})
         distinct = kwargs.pop("distinct", None)
+        limit = kwargs.pop("_limit", 0)
+        skip = kwargs.pop("_skip", 0)
         only_count = kwargs.pop("only_count", False)
         projection: dict = kwargs.pop("projection", {})
         flat_projection = projection.pop("flat", False)
@@ -82,7 +84,7 @@ class BaseModel(pydantic.BaseModel):
         elif only_count:
             return await cls.collection.count_documents(filter=kwargs)
 
-        responses = cls.collection.find(filter=kwargs, projection=projection)
+        responses = cls.collection.find(filter=kwargs, projection=projection, limit=limit, skip=skip)
         if sort_by:
             responses = responses.sort(sort_by)
         if len(projection) == 1 and ("_id" in projection.keys()):
